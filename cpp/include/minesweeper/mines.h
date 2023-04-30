@@ -12,6 +12,14 @@ const static int MINES = 99;
 // 0 - unknown, 1 - mine, n + 2 - open (n mines surrounding)
 using State = uint8_t[HEIGHT][WIDTH];
 
+bool isOpened(const State &state, int i, int j);
+
+bool isFlagged(const State &state, int i, int j);
+
+int getMineCount(const State &state, int i, int j);
+
+bool isNeighbor(const State &state, int i, int j);
+
 class Boundary {
 public:
     auto getCoordinates() const {

@@ -17,8 +17,8 @@ include_directories("${CMAKE_SOURCE_DIR}/cpp/include/minesweeper")
 include_directories("${CMAKE_SOURCE_DIR}/python")
 
 file (GLOB SOURCE_FILES "cpp/src/*.cpp")
-file (GLOB HEADER_FILES "cpp/include/minesweeper/*.hpp")
-file (GLOB PYTHON_FILES "python/*.cpp" "python/*.hpp")
+file (GLOB HEADER_FILES "cpp/include/minesweeper/*.h")
+file (GLOB PYTHON_FILES "python/*.cpp" "python/*.h")
 
 include(pybind11.cmake)
 pybind11_add_module(engine
