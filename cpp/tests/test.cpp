@@ -9,10 +9,10 @@ void prepareState(State& state) {
         }
     }
 
-    state[0][0] = state[0][1] = state[0][2] = state[1][0] = state[2][0] = state[3][0] = 2;
-    state[0][3] = state[1][1] = state[2][1] = state[3][1] = 3;
-    state[1][2] = state[4][0] = state[4][1] = 4;
-    state[1][3] = 6;
+    state[0][0] = state[1][0] = state[2][0] = state[2][1] = 2;
+    state[0][1] = state[1][1] = state[2][2] = state[3][0] = state[3][1] = 3;
+    state[3][2] = 4;
+    state[1][2] = 5;
 }
 
 void printBoundary(const std::vector<std::pair<int, int>>& boundary) {

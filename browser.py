@@ -1,7 +1,12 @@
+import numpy as np
+
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver import ActionChains
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support.expected_conditions import presence_of_element_located
+from time import sleep
 
 from state import State
 
@@ -13,7 +18,7 @@ def initialize():
 
 
 def get_state(driver):
-    canvas = driver.find_element(By.ID, "A43").get_attribute("innerHTML")
+    canvas = WebDriverWait(driver, 20).until(presence_of_element_located((By.ID, "A43"))).get_attribute("innerHTML")
     soup = BeautifulSoup(canvas, "html.parser")
     state = State()
 
@@ -38,3 +43,23 @@ def open_cell(driver, i, j):
 def set_mine(driver, i, j):
     action = ActionChains(driver)
     action.context_click(driver.find_element(By.ID, "cell_{0}_{1}".format(j, i))).perform()
+
+
+def perfect_play(driver, agent):
+    while True:
+        _, state = get_state(driver).get_state()
+        agent.loadState(state)
+        actions = agent.getActions()
+
+        if len(actions) > 0:
+            print(actions)
+            for action in actions:
+                cell, i, j = action
+                if cell == 0:
+                    open_cell(driver, i, j)
+                else:
+                    set_mine(driver, i, j)
+                sleep(0.1 + 0.2 * np.random.random())
+        else:
+            print("out of turns")
+            break

@@ -133,6 +133,9 @@ void setMines(std::vector<Group> constraints, std::unordered_map<int, bool> setV
               std::vector<std::vector<bool>> &variants) {
     while (!constraints.empty() && constraints.back().indices.size() == 1) {
         while (!constraints.empty() && constraints.back().indices.size() == 1) {
+            if (constraints.back().mines > 1) {
+                return;
+            }
             setVariables[constraints.back().indices.back()] = constraints.back().mines;
             constraints.pop_back();
         }
@@ -159,7 +162,7 @@ void setMines(std::vector<Group> constraints, std::unordered_map<int, bool> setV
                 for (int i = 0; i < constraint.indices.size(); ++i) {
                     branchSetVariables[constraint.indices[i]] = (*it)[i];
                 }
-                setMines(reduceConstraints(constraints, setVariables), branchSetVariables, variants);
+                setMines(reduceConstraints(constraints, branchSetVariables), branchSetVariables, variants);
             }
         } while (!(++it).overflow());
     }
