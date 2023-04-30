@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "library.h"
+#include "mines.h"
 
 void prepareState(State& state) {
     for (int i = 0; i < HEIGHT; ++i) {
@@ -49,7 +49,8 @@ int main() {
         std::cout << "| " << group.mines << std::endl;
     }
 
-    for (const auto& variant: getMineVariants(constraints)) {
+    auto variants = getMineVariants(constraints);
+    for (const auto& variant: variants) {
         for (bool var: variant) {
             std::cout << var;
         }
@@ -57,6 +58,10 @@ int main() {
         if (!getVariantValidity(constraints, variant)) {
             std::cout << "FALSE VARIANT" << std::endl;
         }
+    }
+
+    for (double p: getMineProbability(state, variants)) {
+        std::cout << p << " ";
     }
     return 0;
 }

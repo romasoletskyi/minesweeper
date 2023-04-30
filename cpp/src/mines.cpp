@@ -1,7 +1,15 @@
-#include "library.h"
+#include <cmath>
+#include <algorithm>
+#include <numeric>
+
+#include "mines.h"
 
 bool isOpened(const State &state, int i, int j) {
     return state[i][j] >= 2;
+}
+
+bool isFlagged(const State &state, int i, int j) {
+    return state[i][j] == 1;
 }
 
 int getMineCount(const State &state, int i, int j) {
@@ -162,4 +170,75 @@ std::vector<std::vector<bool>> getMineVariants(const std::vector<Group> &constra
     std::unordered_map<int, bool> setVariables;
     setMines(constraints, setVariables, variants);
     return variants;
+}
+
+double diffLogFactorial(int lhs, int rhs) {
+    if (lhs < rhs) {
+        return -diffLogFactorial(rhs, lhs);
+    }
+    double diff = 0;
+    for (int i = rhs + 1; i <= lhs; ++i) {
+        diff += std::log(i);
+    }
+    return diff;
+}
+
+std::vector<double> getMineProbability(const State &state, const std::vector<std::vector<bool>> &variants) {
+    int flags = 0;
+    int open = 0;
+
+    for (int i = 0; i < HEIGHT; ++i) {
+        for (int j = 0; j < WIDTH; ++j) {
+            if (isFlagged(state, i, j)) {
+                ++flags;
+            }
+            if (isOpened(state, i, j)) {
+                ++open;
+            }
+        }
+    }
+
+    std::vector<std::pair<int, int>> binomial;
+    for (const auto &variant: variants) {
+        int sum = 0;
+        for (int var: variant) {
+            sum += var;
+        }
+        binomial.emplace_back(HEIGHT * WIDTH - flags - open - variant.size(), MINES - flags - sum);
+    }
+
+    auto [bestSize, bestMines] = *std::max_element(binomial.begin(), binomial.end(),
+                                                   [](const auto &lhs, const auto &rhs) {
+                                                       return (double) lhs.second / lhs.first <
+                                                              (double) rhs.second / rhs.first;
+                                                   });
+
+    std::vector<double> relative;
+    for (const auto &[size, mines]: binomial) {
+        double log = diffLogFactorial(size, bestSize) - diffLogFactorial(mines, bestMines) -
+                     diffLogFactorial(size - mines, bestSize - bestMines);
+        relative.push_back(std::exp(log));
+    }
+
+    double sum = std::accumulate(relative.begin(), relative.end(), 0.0);
+    std::vector<double> probability;
+    for (double x : relative) {
+        probability.push_back(x / sum);
+    }
+
+    std::vector<double> mineProbability(variants.back().size());
+    for (int i = 0; i < variants.size(); ++i) {
+        for (int j = 0; j < variants[i].size(); ++j) {
+            mineProbability[j] += variants[i][j] * probability[i];
+        }
+    }
+
+    double externalProbability = 0;
+    for (int i = 0; i < variants.size(); ++i) {
+        auto [size, mines] = binomial[i];
+        externalProbability += probability[i] * (double) mines / size;
+    }
+
+    mineProbability.push_back(externalProbability);
+    return mineProbability;
 }

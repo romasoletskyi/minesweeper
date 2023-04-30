@@ -4,10 +4,10 @@
 #include <utility>
 #include <vector>
 #include <unordered_map>
-#include <algorithm>
 
 const static int HEIGHT = 16;
 const static int WIDTH = 30;
+const static int MINES = 99;
 
 // 0 - unknown, 1 - mine, n + 2 - open (n mines surrounding)
 using State = uint8_t[HEIGHT][WIDTH];
@@ -24,6 +24,10 @@ public:
 
     int getIndex(int i, int j) const {
         return indices_.at(packPair(i, j));
+    }
+
+    size_t size() const {
+        return coordinates_.size();
     }
 
 private:
@@ -71,3 +75,5 @@ struct Group {
 std::vector<Group> getMineConstraints(const State &state, const Boundary &boundary);
 
 std::vector<std::vector<bool>> getMineVariants(const std::vector<Group> &constraints);
+
+std::vector<double> getMineProbability(const State &state, const std::vector<std::vector<bool>> &variants);
