@@ -1,6 +1,7 @@
 #include <cmath>
 #include <algorithm>
 #include <numeric>
+#include <optional>
 
 #include "mines.h"
 
@@ -31,7 +32,7 @@ Boundary getBoundary(const State &state) {
     BoundaryBuilder builder;
     for (int i = 0; i < HEIGHT; ++i) {
         for (int j = 0; j < WIDTH; ++j) {
-            if (isNeighbor(state, i, j) && !isOpened(state, i, j)) {
+            if (isNeighbor(state, i, j) && !isOpened(state, i, j) && !isFlagged(state, i, j)) {
                 builder.addPoint(i, j);
             }
         }
@@ -45,18 +46,23 @@ std::vector<Group> getMineConstraints(const State &state, const Boundary &bounda
     for (int i = 0; i < HEIGHT; ++i) {
         for (int j = 0; j < WIDTH; ++j) {
             if (isOpened(state, i, j)) {
+                int mines = getMineCount(state, i, j);
                 std::vector<int> indices;
 
                 for (int n = std::max(i - 1, 0); n < std::min(i + 2, HEIGHT); ++n) {
                     for (int m = std::max(j - 1, 0); m < std::min(j + 2, WIDTH); ++m) {
                         if (!isOpened(state, n, m)) {
-                            indices.push_back(boundary.getIndex(n, m));
+                            if (isFlagged(state, n, m)) {
+                                --mines;
+                            } else {
+                                indices.push_back(boundary.getIndex(n, m));
+                            }
                         }
                     }
                 }
 
                 if (!indices.empty()) {
-                    groups.emplace_back(Group{indices, getMineCount(state, i, j)});
+                    groups.emplace_back(Group{indices, mines});
                 }
             }
         }
@@ -69,8 +75,8 @@ std::vector<Group> getMineConstraints(const State &state, const Boundary &bounda
     return groups;
 }
 
-std::vector<Group> reduceConstraints(const std::vector<Group> &constraints,
-                                     const std::unordered_map<int, bool> &setVariables) {
+std::optional<std::vector<Group>> reduceConstraints(const std::vector<Group> &constraints,
+                                                    const std::unordered_map<int, bool> &setVariables) {
     std::vector<Group> groups;
     for (const auto &group: constraints) {
         std::vector<int> indices;
@@ -79,6 +85,9 @@ std::vector<Group> reduceConstraints(const std::vector<Group> &constraints,
         for (int i: group.indices) {
             if (setVariables.count(i)) {
                 mines -= setVariables.at(i);
+                if (mines < 0) {
+                    return std::nullopt;
+                }
             } else {
                 indices.push_back(i);
             }
@@ -139,7 +148,13 @@ void setMines(std::vector<Group> constraints, std::unordered_map<int, bool> setV
             setVariables[constraints.back().indices.back()] = constraints.back().mines;
             constraints.pop_back();
         }
-        constraints = reduceConstraints(constraints, setVariables);
+
+        auto reduced = reduceConstraints(constraints, setVariables);
+        if (reduced.has_value()) {
+            constraints = std::move(*reduced);
+        } else {
+            return;
+        }
     }
     if (constraints.empty()) {
         std::vector<bool> variant(setVariables.size());
@@ -162,7 +177,11 @@ void setMines(std::vector<Group> constraints, std::unordered_map<int, bool> setV
                 for (int i = 0; i < constraint.indices.size(); ++i) {
                     branchSetVariables[constraint.indices[i]] = (*it)[i];
                 }
-                setMines(reduceConstraints(constraints, branchSetVariables), branchSetVariables, variants);
+
+                auto reduced = reduceConstraints(constraints, branchSetVariables);
+                if (reduced.has_value()) {
+                    setMines(reduced.value(), branchSetVariables, variants);
+                }
             }
         } while (!(++it).overflow());
     }
@@ -202,18 +221,23 @@ std::vector<double> getMineProbability(const State &state, const std::vector<std
     }
 
     std::vector<std::pair<int, int>> binomial;
+    std::vector<std::vector<bool>> variantsFiltered;
     for (const auto &variant: variants) {
         int sum = 0;
         for (int var: variant) {
             sum += var;
         }
-        binomial.emplace_back(HEIGHT * WIDTH - flags - open - variant.size(), MINES - flags - sum);
+        if (flags + sum <= MINES) {
+            binomial.emplace_back(HEIGHT * WIDTH - flags - open - variant.size(), MINES - flags - sum);
+            variantsFiltered.push_back(variant);
+        }
     }
 
     auto [bestSize, bestMines] = *std::max_element(binomial.begin(), binomial.end(),
                                                    [](const auto &lhs, const auto &rhs) {
-                                                       return (double) lhs.second / lhs.first <
-                                                              (double) rhs.second / rhs.first;
+                                                       double lhsRate = (double) lhs.second / lhs.first;
+                                                       double rhsRate = (double) rhs.second / rhs.first;
+                                                       return std::abs(lhsRate - 0.5) > std::abs(rhsRate - 0.5);
                                                    });
 
     std::vector<double> relative;
@@ -225,19 +249,19 @@ std::vector<double> getMineProbability(const State &state, const std::vector<std
 
     double sum = std::accumulate(relative.begin(), relative.end(), 0.0);
     std::vector<double> probability;
-    for (double x : relative) {
+    for (double x: relative) {
         probability.push_back(x / sum);
     }
 
-    std::vector<double> mineProbability(variants.back().size());
-    for (int i = 0; i < variants.size(); ++i) {
-        for (int j = 0; j < variants[i].size(); ++j) {
-            mineProbability[j] += variants[i][j] * probability[i];
+    std::vector<double> mineProbability(variantsFiltered.back().size());
+    for (int i = 0; i < variantsFiltered.size(); ++i) {
+        for (int j = 0; j < variantsFiltered[i].size(); ++j) {
+            mineProbability[j] += variantsFiltered[i][j] * probability[i];
         }
     }
 
     double externalProbability = 0;
-    for (int i = 0; i < variants.size(); ++i) {
+    for (int i = 0; i < variantsFiltered.size(); ++i) {
         auto [size, mines] = binomial[i];
         externalProbability += probability[i] * (double) mines / size;
     }

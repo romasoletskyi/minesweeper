@@ -32,15 +32,15 @@ public:
 
         for (int k = 0; k < coordinates.size(); ++k) {
             auto [i, j] = coordinates[k];
-            if (probability[k] == 0.0) {
+            if (probability[k] < 1e-6) {
                 actions.emplace_back(Action{i, j, Cell::Free});
             }
-            if (probability[k] == 1.0) {
+            if (probability[k] > 1.0 - 1e-6) {
                 actions.emplace_back(Action{i, j, Cell::Mine});
             }
         }
 
-        if (probability.back() == 0.0) {
+        if (probability.back() < 1e-6) {
             for (int i = 0; i < HEIGHT; ++i) {
                 for (int j = 0; j < WIDTH; ++j) {
                     if (!isNeighbor(state_, i, j) && !isFlagged(state_, i, j)) {

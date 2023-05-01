@@ -48,6 +48,7 @@ def set_mine(driver, i, j):
 def perfect_play(driver, agent):
     while True:
         _, state = get_state(driver).get_state()
+        print(state)
         agent.loadState(state)
         actions = agent.getActions()
 
@@ -58,7 +59,8 @@ def perfect_play(driver, agent):
                 if cell == 0:
                     open_cell(driver, i, j)
                 else:
-                    set_mine(driver, i, j)
+                    if state[i, j] == 0:
+                        set_mine(driver, i, j)
                 sleep(0.1 + 0.2 * np.random.random())
         else:
             print("out of turns")
