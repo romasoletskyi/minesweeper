@@ -9,7 +9,11 @@ const static int HEIGHT = 16;
 const static int WIDTH = 30;
 const static int MINES = 99;
 
-// 0 - unknown, 1 - mine, n + 2 - open (n mines surrounding)
+const static int BOMB = 11;
+const static int EMPTY = 2;
+const static int FLAG = 1;
+
+// 0 - unknown, 1 - mine, n + 2 - open (n mines surrounding), 11 - true mine
 using State = uint8_t[HEIGHT][WIDTH];
 
 bool isOpened(const State &state, int i, int j);

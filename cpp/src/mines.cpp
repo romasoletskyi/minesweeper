@@ -6,15 +6,15 @@
 #include "mines.h"
 
 bool isOpened(const State &state, int i, int j) {
-    return state[i][j] >= 2;
+    return state[i][j] >= EMPTY;
 }
 
 bool isFlagged(const State &state, int i, int j) {
-    return state[i][j] == 1;
+    return state[i][j] == FLAG;
 }
 
 int getMineCount(const State &state, int i, int j) {
-    return state[i][j] - 2;
+    return state[i][j] - EMPTY;
 }
 
 bool isNeighbor(const State &state, int i, int j) {

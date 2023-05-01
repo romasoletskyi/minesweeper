@@ -3,13 +3,17 @@ project(minesweeper)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(PROJECT_SOURCE_DIR "src")
 set(PROJECT_INCLUDE_DIR "include/minesweeper")
+set(SOURCE_FILES
+        src/agent.cpp
+        src/mines.cpp
+        src/simulation.cpp)
+set(HEADER_FILES
+        include/minesweeper/agent.h
+        include/minesweeper/mines.h
+        include/minesweeper/simulation.h)
 
-set(SOURCE_FILES ${PROJECT_INCLUDE_DIR}/mines.h ${PROJECT_SOURCE_DIR}/mines.cpp)
-
-add_library(minesweeper SHARED ${SOURCE_FILES})
+add_library(minesweeper SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_include_directories(minesweeper PUBLIC ${PROJECT_INCLUDE_DIR})
 
-add_executable(test tests/test.cpp)
-target_link_libraries(test PRIVATE minesweeper)
+add_subdirectory(tests)
