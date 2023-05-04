@@ -1,33 +1,33 @@
 #pragma once
 
 #include "mines.h"
+#include "simulation.h"
+#include "tree.h"
 
-enum Cell {
-    Free,
-    Mine
-};
+namespace agent {
+    std::vector<game::Action> getExactActions(const game::State &state);
 
-struct Action {
-    int i, j;
-    Cell cell;
-};
+    class RandomAgent {
+    public:
+        explicit RandomAgent(std::mt19937 &gen) : gen_(gen) {}
 
-class ExactAgent {
-public:
-    void loadState(const State& state);
+        std::vector<game::Action> getActions(const game::State &state);
 
-    std::vector<Action> getActions() const;
+    private:
+        std::mt19937 &gen_;
+    };
 
-private:
-    State state_;
-};
+    class TreeAgent {
+    private:
+        const int STEPS = 1000;
 
-class RandomAgent {
-public:
-    void loadState(const State& state);
+    public:
+        explicit TreeAgent(std::mt19937 &gen) : gen_(gen) {}
 
-    std::vector<Action> getActions() const;
+        std::vector<game::Action> getActions(const game::State &state);
 
-private:
-    ExactAgent agent_;
-};
+    private:
+        std::mt19937 &gen_;
+        tree::Tree tree_;
+    };
+}

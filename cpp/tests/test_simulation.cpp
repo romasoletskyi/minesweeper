@@ -1,5 +1,9 @@
 #include <iostream>
+
 #include "simulation.h"
+#include "agent.h"
+
+using namespace game;
 
 void printState(const State& state) {
     std::cout << "┌";
@@ -35,7 +39,8 @@ void printState(const State& state) {
 }
 
 void interactive() {
-    Board board;
+    std::mt19937 gen;
+    Board board(gen);
 
     while (true) {
         char command;
@@ -43,7 +48,7 @@ void interactive() {
         std::cin >> command >> i >> j;
 
         if (command == 'o') {
-            auto result = board.open(i, j);
+            auto result = board.act(Action{i, j, Cell::Open});
             if (result != GameResult::Continue) {
                 if (result == GameResult::Win) {
                     std::cout << "WIN" << std::endl;
@@ -53,14 +58,47 @@ void interactive() {
                 break;
             }
         } else if (command == 'f') {
-            board.flag(i, j);
+            board.act(Action{i, j, Cell::Flag});
         }
 
         printState(board.getState());
     }
 }
 
+bool simple(std::mt19937& gen, bool verbose) {
+    Board board(gen);
+    agent::RandomAgent agent(gen);
+
+    while(true) {
+        auto actions = agent.getActions(board.getState());
+        for (auto action: actions) {
+            auto result = board.act(action);
+            if (result != GameResult::Continue) {
+                if (result == GameResult::Win) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            if (verbose) {
+                printState(board.getState());
+                printState(board.getSecretState());
+            }
+        }
+    }
+}
+
 int main() {
-    interactive();
+    // interactive();
+
+    int games = 100;
+    int won = 0;
+    std::mt19937 gen(42);
+
+    for (int i = 0; i < games; ++i) {
+        bool result = simple(gen, false);
+        won += result;
+    }
+    std::cout << "won " << won << "/" << games;
     return 0;
 }

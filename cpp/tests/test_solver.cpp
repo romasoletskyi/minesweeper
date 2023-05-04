@@ -2,6 +2,7 @@
 
 #include "mines.h"
 
+using namespace game;
 const static std::string mineState = "[[2 2 2 2 2 2 3 0 0]\n"
                                      " [3 3 2 3 3 4 4 0 0]\n"
                                      " [1 3 2 3 1 4 1 4 0]\n"
@@ -54,18 +55,18 @@ int main() {
         std::cout << "| " << group.mines << std::endl;
     }
 
-    auto variants = getMineVariants(constraints);
+    auto variants = getMineVariants(state, constraints);
     for (const auto &variant: variants) {
-        for (bool var: variant) {
+        for (bool var: variant.variables) {
             std::cout << var;
         }
         std::cout << std::endl;
-        if (!getVariantValidity(constraints, variant)) {
+        if (!getVariantValidity(constraints, variant.variables)) {
             std::cout << "FALSE VARIANT" << std::endl;
         }
     }
 
-    for (double p: getMineProbability(state, variants)) {
+    for (double p: getMineProbability(variants, getVariantProbability(state, variants))) {
         std::cout << p << " ";
     }
     return 0;
