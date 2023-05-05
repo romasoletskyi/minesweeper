@@ -69,8 +69,38 @@ namespace agent {
         return {Action{i, j, Cell::Open}};
     }
 
-    std::vector<game::Action> TreeAgent::getActions(const State &state) {
-        tree_.moveto(state);
+    game::GameResult RandomAgent::rollout(const State &state) {
         auto board = PerfectBoard(gen_, state);
+        while (true) {
+            auto actions = getActions(board.getState());
+            for (auto action: actions) {
+                auto result = board.act(action);
+                if (isTerminal(result)) {
+                    return result;
+                }
+            }
+        }
+    }
+
+    std::vector<game::Action> TreeAgent::getActions(const State &state) {
+        auto actions = getExactActions(state);
+        if (!actions.empty()) {
+            return actions;
+        }
+
+        tree_.moveto(state, getSimplePolicy(state));
+        auto agent = RandomAgent(gen_);
+
+        for (int i = 0; i < STEPS; ++i) {
+            auto leaf = tree_.explore();
+            tree_.updateNode(getSimplePolicy(state), getReward(agent.rollout(leaf)));
+        }
+
+        return {tree_.sampleAction()};
+    }
+
+    std::vector<double> TreeAgent::getSimplePolicy(const State &state) {
+        size_t actionSpace = getPossibleActions(state).size();
+        return std::vector<double>(actionSpace, 1.0 / (double) actionSpace);
     }
 }

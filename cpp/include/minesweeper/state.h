@@ -2,8 +2,8 @@
 
 namespace game {
     const static int HEIGHT = 16;//16;
-    const static int WIDTH = 30;//30;
-    const static int MINES = 99;//99;
+    const static int WIDTH = 16;//30;
+    const static int MINES = 40;//99;
 
     const static int BOMB = 11;
     const static int EMPTY = 2;

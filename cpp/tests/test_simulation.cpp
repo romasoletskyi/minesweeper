@@ -65,9 +65,10 @@ void interactive() {
     }
 }
 
-bool simple(std::mt19937& gen, bool verbose) {
+template<class Agent>
+bool play(std::mt19937& gen, bool verbose) {
     Board board(gen);
-    agent::RandomAgent agent(gen);
+    Agent agent(gen);
 
     while(true) {
         auto actions = agent.getActions(board.getState());
@@ -82,7 +83,6 @@ bool simple(std::mt19937& gen, bool verbose) {
             }
             if (verbose) {
                 printState(board.getState());
-                printState(board.getSecretState());
             }
         }
     }
@@ -91,14 +91,9 @@ bool simple(std::mt19937& gen, bool verbose) {
 int main() {
     // interactive();
 
-    int games = 100;
-    int won = 0;
-    std::mt19937 gen(42);
+    std::mt19937 gen(17);
+    bool result = play<agent::TreeAgent>(gen, true);
+    std::cout << (result ? "WIN": "LOSE");
 
-    for (int i = 0; i < games; ++i) {
-        bool result = simple(gen, false);
-        won += result;
-    }
-    std::cout << "won " << won << "/" << games;
     return 0;
 }

@@ -227,10 +227,6 @@ namespace game {
         return open_;
     }
 
-    const State& Board::getSecretState() const {
-        return state_;
-    }
-
     GameResult Board::checkWinCondition() const {
         if (openedCells_ == WIDTH * HEIGHT - MINES) {
             return GameResult::Win;

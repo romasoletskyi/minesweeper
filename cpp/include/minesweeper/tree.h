@@ -27,25 +27,30 @@ namespace tree {
         };
 
     public:
-        void moveto(const game::State& state);
+        explicit Tree(std::mt19937 &gen) : gen_(gen) {}
 
-        game::State explore(const game::PerfectBoard& board);
+        void moveto(const game::State &state, std::vector<double> policy);
 
-        void updateNode(const std::vector<double> &policy, double value);
+        game::State explore();
+
+        void updateNode(std::vector<double> policy, double value);
+
+        game::Action sampleAction() const;
 
         ~Tree() {
-            for (const auto& [_, node]: states_) {
+            for (const auto &[_, node]: states_) {
                 delete node;
             }
         }
 
     private:
-        Node* createNode(const game::State& state, Node* parent, int parentActionIndex);
+        Node *createNode(const game::State &state, Node *parent, int parentActionIndex);
 
         void propagateValue(Node *node, double value);
 
     private:
-        std::unordered_map<game::State, Node*> states_;
+        std::unordered_map<game::State, Node *> states_;
+        std::mt19937 &gen_;
         Node *root_ = nullptr;
         Node *updated_ = nullptr;
     };

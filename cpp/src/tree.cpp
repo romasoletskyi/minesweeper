@@ -1,19 +1,23 @@
 #include <valarray>
+#include <iostream>
 #include "tree.h"
 
 namespace tree {
-    void Tree::moveto(const game::State &state) {
+    void Tree::moveto(const game::State &state, std::vector<double> policy) {
         if (states_.count(state)) {
             root_ = states_.at(state);
         } else {
             root_ = nullptr;
         }
 
-        std::unordered_set<Node*> states;
-        std::vector<Node*> nodes;
+        std::unordered_set<Node *> states;
+        std::vector<Node *> nodes;
         if (!root_) {
-            nodes.push_back(root_);
+            root_ = createNode(state, nullptr, 0);
+            root_->policy = std::move(policy);
         }
+        root_->parent = nullptr;
+        nodes.push_back(root_);
 
         while (!nodes.empty()) {
             auto node = nodes.back();
@@ -25,7 +29,7 @@ namespace tree {
             }
         }
 
-        for (const auto& [_, node]: states_) {
+        for (const auto &[_, node]: states_) {
             if (!states.count(node)) {
                 delete node;
             }
@@ -35,19 +39,19 @@ namespace tree {
         for (auto node: states) {
             states_[node->state] = node;
         }
+        std::cout << "moved to tree with " << states_.size() << " nodes" << std::endl;
     }
 
-    game::State Tree::explore(const game::PerfectBoard& board) {
+    game::State Tree::explore() {
         while (true) {
             Node *parent = nullptr;
             Node *node = root_;
 
             int actionIndexBest;
             game::State state;
+            auto board = game::PerfectBoard(gen_, root_->state);
 
-            auto boardCopy = board;
-
-            while (!node && !(node->terminal)) {
+            while (node && !(node->terminal)) {
                 int nVisitsSum = 0;
                 double uValues[node->actions.size()];
 
@@ -65,8 +69,8 @@ namespace tree {
                     }
                 }
 
-                boardCopy.act(node->actions[actionIndexBest]);
-                state = boardCopy.getState();
+                board.act(node->actions[actionIndexBest]);
+                state = board.getState();
 
                 parent = node;
                 if (states_.count(state)) {
@@ -81,11 +85,7 @@ namespace tree {
             if (!node) {
                 node = createNode(state, parent, actionIndexBest);
                 states_[state] = node;
-                if (!parent) {
-                    root_ = node;
-                } else {
-                    parent->children.insert(node);
-                }
+                parent->children.insert(node);
                 updated_ = node;
             }
 
@@ -97,13 +97,13 @@ namespace tree {
         }
     }
 
-    void Tree::updateNode(const std::vector<double> &policy, double value) {
-        updated_->policy = policy;
+    void Tree::updateNode(std::vector<double> policy, double value) {
+        updated_->policy = std::move(policy);
         updated_->value = value;
         propagateValue(updated_, value);
     }
 
-    Tree::Node *Tree::createNode(const game::State &state, Node* parent, int parentActionIndex) {
+    Tree::Node *Tree::createNode(const game::State &state, Node *parent, int parentActionIndex) {
         auto node = new Node();
         node->parent = parent;
         node->parentActionIndex = parentActionIndex;
@@ -126,7 +126,7 @@ namespace tree {
         int action = node->parentActionIndex;
         node = node->parent;
 
-        while (!node) {
+        while (node) {
             node->qValues[action] =
                     (node->qValues[action] * node->nVisits[action] + value) / (node->nVisits[action] + 1);
             ++(node->nVisits[action]);
@@ -134,5 +134,16 @@ namespace tree {
             action = node->parentActionIndex;
             node = node->parent;
         }
+    }
+
+    game::Action Tree::sampleAction() const {
+        std::cout << "sample from tree with " << states_.size() << " nodes" << std::endl;
+        std::vector<int> cumulative(root_->nVisits.size());
+        std::partial_sum(root_->nVisits.begin(), root_->nVisits.end(), cumulative.begin());
+
+        size_t index = std::distance(cumulative.begin(),
+                                     std::lower_bound(cumulative.begin(), cumulative.end(),
+                                                      std::uniform_int_distribution<>(1, cumulative.back())(gen_)));
+        return root_->actions[index];
     }
 }

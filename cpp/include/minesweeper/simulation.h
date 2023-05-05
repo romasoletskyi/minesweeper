@@ -41,8 +41,6 @@ namespace game {
 
         const State &getState() const;
 
-        const State& getSecretState() const;
-
     private:
         void setMine(int i, int j);
 
