@@ -11,14 +11,14 @@ set(SOURCE_FILES
         src/agent.cpp
         src/mines.cpp
         src/simulation.cpp
-        src/state.cpp
         src/tree.cpp)
 set(HEADER_FILES
         include/minesweeper/agent.h
         include/minesweeper/mines.h
         include/minesweeper/simulation.h
         include/minesweeper/state.h
-        include/minesweeper/tree.h)
+        include/minesweeper/tree.h
+        include/minesweeper/utils.h)
 
 add_library(minesweeper SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_include_directories(minesweeper PUBLIC ${PROJECT_INCLUDE_DIR})

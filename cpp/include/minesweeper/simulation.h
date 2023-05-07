@@ -15,7 +15,7 @@ namespace game {
 
     double getReward(GameResult result);
 
-    GameResult getStateResult(const State& state);
+    GameResult getStateResult(const State &state);
 
     bool isTerminal(GameResult result);
 
@@ -29,21 +29,19 @@ namespace game {
         Cell cell;
     };
 
-    std::vector<Action> getPossibleActions(const State& state);
+    std::vector<Action> getPossibleActions(const State &state);
 
     class Board {
     public:
-        Board(std::mt19937& gen);
+        explicit Board(std::mt19937 &gen);
 
-        Board(std::mt19937& gen, const State& start);
+        Board(std::mt19937 &gen, const StateAnalysis &analysis);
 
         GameResult act(Action action);
 
         const State &getState() const;
 
     private:
-        void setMine(int i, int j);
-
         void setMineCount(int i, int j, int count);
 
         int countNeighborMines(int i, int j) const;
@@ -65,7 +63,7 @@ namespace game {
     private:
         State state_;
         State open_;
-        std::mt19937& gen_;
+        std::mt19937 &gen_;
 
         int openedCells_ = 0;
         bool clear_ = true;
@@ -73,9 +71,9 @@ namespace game {
 
     class PerfectBoard {
     public:
-        PerfectBoard(std::mt19937& gen);
+        explicit PerfectBoard(std::mt19937 &gen);
 
-        PerfectBoard(std::mt19937& gen, const State& state);
+        PerfectBoard(std::mt19937 &gen, const StateAnalysis &analysis);
 
         GameResult act(Action action);
 

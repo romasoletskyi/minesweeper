@@ -9,6 +9,7 @@ namespace tree {
     class Tree {
     private:
         const double CPUCT = 1;
+        const int MAXITER = 10;
 
         struct Node {
             game::State state;
@@ -31,7 +32,7 @@ namespace tree {
 
         void moveto(const game::State &state, std::vector<double> policy);
 
-        game::State explore();
+        game::PerfectBoard explore();
 
         void updateNode(std::vector<double> policy, double value);
 
@@ -50,6 +51,7 @@ namespace tree {
 
     private:
         std::unordered_map<game::State, Node *> states_;
+        game::StateAnalysis rootAnalysis_;
         std::mt19937 &gen_;
         Node *root_ = nullptr;
         Node *updated_ = nullptr;

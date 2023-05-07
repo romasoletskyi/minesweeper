@@ -8,74 +8,43 @@
 #include "state.h"
 
 namespace game {
-    class Boundary {
-    public:
-        std::vector<std::pair<int, int>> getCoordinates() const {
-            std::vector<std::pair<int, int>> co;
-            for (int c: coordinates_) {
-                co.emplace_back(unpackPair(c));
-            }
-            return co;
-        }
-
-        int getIndex(int i, int j) const {
-            return indices_.at(packPair(i, j));
-        }
-
-    private:
-        static std::pair<int, int> unpackPair(int c) {
-            return {c >> 16, c & 0xffff};
-        }
-
-        static int packPair(int i, int j) {
-            return i << 16 | j;
-        }
-
-    private:
-        friend class BoundaryBuilder;
-
-        std::vector<int> coordinates_;
-        std::unordered_map<int, int> indices_;
-    };
-
-    class BoundaryBuilder {
-    public:
-        void addPoint(int i, int j) {
-            coordinates_.push_back(Boundary::packPair(i, j));
-        }
-
-        Boundary build() {
-            Boundary boundary;
-            boundary.coordinates_ = std::move(coordinates_);
-            for (int i = 0; i < boundary.coordinates_.size(); ++i) {
-                boundary.indices_[boundary.coordinates_[i]] = i;
-            }
-            return boundary;
-        }
-
-    private:
-        std::vector<int> coordinates_;
-    };
-
-    Boundary getBoundary(const State &state);
-
     struct Group {
         std::vector<int> indices;
-        int mines;
+        int mines = 0;
     };
 
-    std::vector<Group> getMineConstraints(const State &state, const Boundary &boundary);
+    struct Constraint {
+        std::vector<Group> groups;
+        std::vector<std::pair<int, int>> coordinates;
+    };
+
+    Constraint getMineConstraints(const State &state);
+
+    std::vector<Constraint> decoupleMineConstraints(const Constraint& constraint);
 
     struct Variant {
         std::vector<bool> variables;
-        int leftSpace;
-        int leftMines;
     };
 
-    std::vector<Variant> getMineVariants(const State &state, const std::vector<Group> &constraints);
+    std::vector<Variant> getMineVariants(const std::vector<Group> &constraints);
 
-    std::vector<double> getVariantProbability(const State &state, const std::vector<Variant> &variants);
+    std::vector<double> getPositionScore(const std::vector<int> &leftMines, int leftSpace);
 
-    std::vector<double>
-    getMineProbability(const std::vector<Variant> &variants, const std::vector<double> &variantProbability);
+    struct StateAnalysis {
+        struct VariantGroup {
+            std::vector<int> indices;
+            int mines;
+        };
+
+        State state;
+
+        std::vector<std::vector<std::pair<int, int>>> coordinates;
+        std::vector<std::vector<Variant>> variants;
+        std::vector<std::vector<VariantGroup>> condensedVariants;
+
+        std::vector<std::vector<int>> condensedVariantsIndices;
+        std::vector<double> condensedVariantsProbability;
+    };
+
+    StateAnalysis analyzeState(const State& state);
 }

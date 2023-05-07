@@ -2,59 +2,146 @@
 #include <algorithm>
 #include <numeric>
 #include <optional>
+#include <unordered_set>
 
 #include "mines.h"
 
+template<>
+struct std::hash<std::pair<int, int>> {
+    size_t operator()(const std::pair<int, int> &x) const noexcept {
+        return std::hash<int64_t>()(static_cast<int64_t>(x.first) << 32 | x.second);
+    }
+};
+
 namespace game {
-    Boundary getBoundary(const State &state) {
-        BoundaryBuilder builder;
+    static const std::vector<std::pair<int, int>> offset = {{-1, -1},
+                                                            {-1, 0},
+                                                            {-1, 1},
+                                                            {0,  -1},
+                                                            {0,  1},
+                                                            {1,  -1},
+                                                            {1,  0},
+                                                            {1,  1}};
+
+    Constraint getMineConstraints(const State &state) {
+        std::vector<Group> groups(HEIGHT * WIDTH);
         for (int i = 0; i < HEIGHT; ++i) {
             for (int j = 0; j < WIDTH; ++j) {
-                if (isNeighbor(state, i, j) && !isOpened(state, i, j) && !isFlagged(state, i, j)) {
-                    builder.addPoint(i, j);
+                if (state[i][j] > EMPTY) {
+                    groups[i * WIDTH + j].mines = state[i][j] - EMPTY;
                 }
             }
         }
-        return builder.build();
-    }
 
-    std::vector<Group> getMineConstraints(const State &state, const Boundary &boundary) {
-        std::vector<Group> groups;
+        std::unordered_map<std::pair<int, int>, int> indices;
 
-        for (int i = 0; i < HEIGHT; ++i) {
-            for (int j = 0; j < WIDTH; ++j) {
-                if (isOpened(state, i, j)) {
-                    int mines = getMineCount(state, i, j);
-                    std::vector<int> indices;
+        for (auto [dRow, dColumn]: offset) {
+            int startRow = std::max(-dRow, 0);
+            int endRow = std::min(HEIGHT - dRow, HEIGHT);
+            int startColumn = std::max(-dColumn, 0);
+            int endColumn = std::min(WIDTH - dColumn, WIDTH);
 
-                    for (int n = std::max(i - 1, 0); n < std::min(i + 2, HEIGHT); ++n) {
-                        for (int m = std::max(j - 1, 0); m < std::min(j + 2, WIDTH); ++m) {
-                            if (!isOpened(state, n, m)) {
-                                if (isFlagged(state, n, m)) {
-                                    --mines;
-                                } else {
-                                    indices.push_back(boundary.getIndex(n, m));
-                                }
+            for (int i = startRow; i < endRow; ++i) {
+                for (int j = startColumn; j < endColumn; ++j) {
+                    if (state[i][j] >= EMPTY) {
+                        if (state[i + dRow][j + dColumn] == FLAG) {
+                            --groups[i * WIDTH + j].mines;
+                        } else if (!state[i + dRow][j + dColumn]) {
+                            auto pair = std::make_pair(i + dRow, j + dColumn);
+                            if (indices.count(pair)) {
+                                groups[i * WIDTH + j].indices.push_back(indices[pair]);
+                            } else {
+                                int index = static_cast<int>(indices.size());
+                                groups[i * WIDTH + j].indices.push_back(index);
+                                indices[pair] = index;
                             }
                         }
                     }
-
-                    if (!indices.empty()) {
-                        groups.emplace_back(Group{indices, mines});
-                    }
                 }
             }
         }
 
-        std::sort(groups.begin(), groups.end(), [](const Group &lhs, const Group &rhs) {
-            return lhs.indices.size() > rhs.indices.size();
-        });
+        std::vector<Group> filteredGroups;
+        for (const auto &group: groups) {
+            if (!group.indices.empty()) {
+                filteredGroups.push_back(group);
+            }
+        }
 
-        return groups;
+        std::vector<std::pair<int, int>> coordinates(indices.size());
+        for (const auto &[pair, index]: indices) {
+            coordinates[index] = pair;
+        }
+
+        return {filteredGroups, coordinates};
     }
 
-    std::optional<std::vector<Group>> reduceConstraints(const std::vector<Group> &constraints,
-                                                        const std::unordered_map<int, bool> &setVariables) {
+    std::vector<Constraint> decoupleMineConstraints(const Constraint &constraint) {
+        std::vector<std::vector<int>> edges(constraint.coordinates.size());
+        std::vector<std::vector<int>> vertexToGroup(constraint.coordinates.size());
+
+        for (int i = 0; i < constraint.groups.size(); ++i) {
+            const auto &indices = constraint.groups[i].indices;
+            for (int j = 1; j < indices.size(); ++j) {
+                edges[indices[j]].push_back(indices[j - 1]);
+                edges[indices[j - 1]].push_back(indices[j]);
+            }
+            for (int vertex: indices) {
+                vertexToGroup[vertex].push_back(i);
+            }
+        }
+
+        std::unordered_set<int> visited;
+        std::vector<Constraint> constraints;
+
+        for (int i = 0; i < constraint.coordinates.size(); ++i) {
+            std::unordered_set<int> visitedGroups;
+            std::unordered_map<int, int> visitedVertices;
+            std::vector<int> vertices = {i};
+
+            while (!vertices.empty()) {
+                int vertex = vertices.back();
+                vertices.pop_back();
+                if (!visited.count(vertex)) {
+                    visited.insert(vertex);
+                    visitedVertices[vertex] = static_cast<int>(visitedVertices.size());
+                    for (int neighbor: edges[vertex]) {
+                        vertices.push_back(neighbor);
+                    }
+                }
+            }
+
+            for (auto [vertex, _]: visitedVertices) {
+                for (int group: vertexToGroup[vertex]) {
+                    visitedGroups.insert(group);
+                }
+            }
+
+            Constraint c;
+            c.coordinates.resize(visitedVertices.size());
+
+            for (auto [vertex, vertexIndex]: visitedVertices) {
+                c.coordinates[vertexIndex] = constraint.coordinates[vertex];
+            }
+            for (int group: visitedGroups) {
+                Group g;
+                g.mines = constraint.groups[group].mines;
+                for (int vertex: constraint.groups[group].indices) {
+                    g.indices.push_back(visitedVertices[vertex]);
+                }
+                c.groups.emplace_back(std::move(g));
+            }
+
+            if (!c.groups.empty()) {
+                constraints.emplace_back(std::move(c));
+            }
+        }
+
+        return constraints;
+    }
+
+    std::vector<Group> reduceConstraints(const std::vector<Group> &constraints,
+                                         const std::unordered_map<int, bool> &setVariables) {
         std::vector<Group> groups;
         for (const auto &group: constraints) {
             std::vector<int> indices;
@@ -63,17 +150,12 @@ namespace game {
             for (int i: group.indices) {
                 if (setVariables.count(i)) {
                     mines -= setVariables.at(i);
-                    if (mines < 0) {
-                        return std::nullopt;
-                    }
                 } else {
                     indices.push_back(i);
                 }
             }
 
-            if (!indices.empty()) {
-                groups.push_back(Group{indices, mines});
-            }
+            groups.push_back(Group{indices, mines});
         }
 
         std::sort(groups.begin(), groups.end(), [](const Group &lhs, const Group &rhs) {
@@ -117,29 +199,42 @@ namespace game {
     };
 
     void setMines(std::vector<Group> constraints, std::unordered_map<int, bool> setVariables,
-                  std::vector<std::vector<bool>> &variants) {
-        while (!constraints.empty() && constraints.back().indices.size() == 1) {
-            while (!constraints.empty() && constraints.back().indices.size() == 1) {
-                if (constraints.back().mines > 1) {
+                  std::vector<Variant> &variants) {
+        while (!constraints.empty()) {
+            bool reduce = false;
+            while (!constraints.empty()) {
+                if (constraints.back().mines < 0 ||
+                    constraints.back().mines > constraints.back().indices.size()) {
                     return;
+                } else if (constraints.back().mines == 0 ||
+                           constraints.back().mines == constraints.back().indices.size()) {
+                    reduce = true;
+                    bool set = constraints.back().mines;
+                    for (int var: constraints.back().indices) {
+                        if (setVariables.count(var)) {
+                            if (setVariables.at(var) != set) {
+                                return;
+                            }
+                        } else {
+                            setVariables[var] = set;
+                        }
+                    }
+                    constraints.pop_back();
+                } else {
+                    break;
                 }
-                setVariables[constraints.back().indices.back()] = constraints.back().mines;
-                constraints.pop_back();
             }
-
-            auto reduced = reduceConstraints(constraints, setVariables);
-            if (reduced.has_value()) {
-                constraints = std::move(*reduced);
-            } else {
-                return;
+            if (!reduce) {
+                break;
             }
+            constraints = reduceConstraints(constraints, setVariables);
         }
         if (constraints.empty()) {
             std::vector<bool> variant(setVariables.size());
             for (const auto &[index, variable]: setVariables) {
                 variant[index] = variable;
             }
-            variants.push_back(variant);
+            variants.emplace_back(Variant{variant});
         } else {
             auto constraint = std::move(constraints.back());
             constraints.pop_back();
@@ -157,48 +252,17 @@ namespace game {
                     }
 
                     auto reduced = reduceConstraints(constraints, branchSetVariables);
-                    if (reduced.has_value()) {
-                        setMines(reduced.value(), branchSetVariables, variants);
-                    }
+                    setMines(reduced, branchSetVariables, variants);
                 }
             } while (!(++it).overflow());
         }
     }
 
-    std::vector<Variant> getMineVariants(const State &state, const std::vector<Group> &constraints) {
-        std::vector<std::vector<bool>> variants;
+    std::vector<Variant> getMineVariants(const std::vector<Group> &constraints) {
+        std::vector<Variant> variants;
         std::unordered_map<int, bool> setVariables;
-        setMines(constraints, setVariables, variants);
-
-        int flags = 0;
-        int open = 0;
-
-        for (int i = 0; i < HEIGHT; ++i) {
-            for (int j = 0; j < WIDTH; ++j) {
-                if (isFlagged(state, i, j)) {
-                    ++flags;
-                }
-                if (isOpened(state, i, j)) {
-                    ++open;
-                }
-            }
-        }
-
-        std::vector<Variant> variantsFiltered;
-
-        for (const auto &variant: variants) {
-            int sum = 0;
-            for (int var: variant) {
-                sum += var;
-            }
-            if (flags + sum <= MINES) {
-                variantsFiltered.emplace_back(Variant{variant,
-                                                      HEIGHT * WIDTH - flags - open - (int) variant.size(),
-                                                      MINES - flags - sum});
-            }
-        }
-
-        return variantsFiltered;
+        setMines(reduceConstraints(constraints, setVariables), setVariables, variants);
+        return variants;
     }
 
     double diffLogFactorial(int lhs, int rhs) {
@@ -212,52 +276,108 @@ namespace game {
         return diff;
     }
 
-    std::vector<double> getVariantProbability(const State &state, const std::vector<Variant> &variants) {
-        auto bestVariant = *std::max_element(variants.begin(), variants.end(), [](const auto &lhs, const auto &rhs) {
-            double lhsRate = (double) lhs.leftMines / lhs.leftSpace;
-            double rhsRate = (double) rhs.leftMines / rhs.leftSpace;
-            return std::abs(lhsRate - 0.5) > std::abs(rhsRate - 0.5);
-        });
+    std::vector<double> getPositionScore(const std::vector<int> &leftMines, int leftSpace) {
+        int bestMines = *std::max_element(leftMines.begin(), leftMines.end(),
+                                          [leftSpace](const auto &lhs, const auto &rhs) {
+                                              double lhsRate = (double) lhs / leftSpace;
+                                              double rhsRate = (double) rhs / leftSpace;
+                                              return std::abs(lhsRate - 0.5) > std::abs(rhsRate - 0.5);
+                                          });
+        std::vector<double> score;
+        score.reserve(leftMines.size());
 
-        int bestSpace = bestVariant.leftSpace;
-        int bestMines = bestVariant.leftMines;
-        std::vector<double> relative;
-        relative.reserve(variants.size());
-
-        for (const auto& variant: variants) {
-            int space = variant.leftSpace;
-            int mines = variant.leftMines;
-            double log = diffLogFactorial(space, bestSpace) - diffLogFactorial(mines, bestMines) -
-                         diffLogFactorial(space - mines, bestSpace - bestMines);
-            relative.push_back(std::exp(log));
-        }
-
-        double sum = std::accumulate(relative.begin(), relative.end(), 0.0);
-        std::vector<double> probability;
-        probability.reserve(variants.size());
-
-        for (double x: relative) {
-            probability.push_back(x / sum);
-        }
-
-        return probability;
-    }
-
-    std::vector<double>
-    getMineProbability(const std::vector<Variant> &variants, const std::vector<double> &variantProbability) {
-        std::vector<double> mineProbability(variants.back().variables.size() + 1);
-        for (int i = 0; i < variants.size(); ++i) {
-            for (int j = 0; j < variants[i].variables.size(); ++j) {
-                mineProbability[j] += variants[i].variables[j] * variantProbability[i];
+        for (int mines: leftMines) {
+            if (mines < 0 || mines > leftSpace) {
+                score.push_back(0);
+            } else {
+                score.push_back(std::exp(diffLogFactorial(bestMines, mines) +
+                                         diffLogFactorial(leftSpace - bestMines, leftSpace - mines)));
             }
         }
 
-        for (int i = 0; i < variants.size(); ++i) {
-            int space = variants[i].leftSpace;
-            int mines = variants[i].leftMines;
-            mineProbability.back() += variantProbability[i] * (double) mines / space;
+        return score;
+    }
+
+    StateAnalysis analyzeState(const State &state) {
+        StateAnalysis analysis = {state};
+
+        auto constraints = decoupleMineConstraints(getMineConstraints(state));
+        for (const auto &constraint: constraints) {
+            analysis.coordinates.emplace_back(constraint.coordinates);
         }
 
-        return mineProbability;
+        for (const auto &constraint: constraints) {
+            analysis.variants.emplace_back(getMineVariants(constraint.groups));
+        }
+
+        for (const auto &coupledVariants: analysis.variants) {
+            std::unordered_map<int, std::vector<int>> variantMines;
+            for (int i = 0; i < coupledVariants.size(); ++i) {
+                int mines = 0;
+                for (int cell: coupledVariants[i].variables) {
+                    mines += cell;
+                }
+                variantMines[mines].push_back(i);
+            }
+
+            std::vector<StateAnalysis::VariantGroup> variantGroups;
+            for (const auto &[mines, group]: variantMines) {
+                variantGroups.emplace_back(StateAnalysis::VariantGroup{group, mines});
+            }
+            analysis.condensedVariants.emplace_back(std::move(variantGroups));
+        }
+
+        int pivot = 0, size = static_cast<int>(analysis.condensedVariants.size());
+        std::vector<int> index(size);
+
+        int leftSpace = HEIGHT * WIDTH;
+        int leftMines = MINES;
+        for (int i = 0; i < HEIGHT; ++i) {
+            for (int j = 0; j < WIDTH; ++j) {
+                if (state[i][j]) {
+                    if (state[i][j] == FLAG) {
+                        --leftMines;
+                    }
+                    --leftSpace;
+                }
+            }
+        }
+        for (const auto &coordinates: analysis.coordinates) {
+            leftSpace -= static_cast<int>(coordinates.size());
+        }
+
+        std::vector<int> leftCondensedVariantsMines;
+
+        while (true) {
+            int mines = 0;
+            for (int i = 0; i < size; ++i) {
+                mines += analysis.condensedVariants[i][index[i]].mines;
+            }
+            leftCondensedVariantsMines.push_back(leftMines - mines);
+
+            analysis.condensedVariantsIndices.push_back(index);
+            while (pivot < size && ++index[pivot] == analysis.condensedVariants[pivot].size()) {
+                index[pivot++] = 0;
+            }
+            if (pivot == size) {
+                break;
+            }
+            pivot = 0;
+        }
+
+        auto score = getPositionScore(leftCondensedVariantsMines, leftSpace);
+        for (int i = 0; i < score.size(); ++i) {
+            for (int j = 0; j < size; ++j) {
+                score[i] *= static_cast<double>(analysis.condensedVariants[j][analysis.condensedVariantsIndices[i][j]].indices.size());
+            }
+        }
+
+        double scoreSum = std::accumulate(score.begin(), score.end(), 0.0);
+        for (double &s: score) {
+            s /= scoreSum;
+        }
+
+        analysis.condensedVariantsProbability = std::move(score);
+        return analysis;
     }
 }

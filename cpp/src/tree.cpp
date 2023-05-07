@@ -1,5 +1,4 @@
 #include <valarray>
-#include <iostream>
 #include "tree.h"
 
 namespace tree {
@@ -16,6 +15,7 @@ namespace tree {
             root_ = createNode(state, nullptr, 0);
             root_->policy = std::move(policy);
         }
+        rootAnalysis_ = game::analyzeState(state);
         root_->parent = nullptr;
         nodes.push_back(root_);
 
@@ -39,17 +39,16 @@ namespace tree {
         for (auto node: states) {
             states_[node->state] = node;
         }
-        std::cout << "moved to tree with " << states_.size() << " nodes" << std::endl;
     }
 
-    game::State Tree::explore() {
+    game::PerfectBoard Tree::explore() {
+        int it = 0;
         while (true) {
             Node *parent = nullptr;
             Node *node = root_;
 
             int actionIndexBest;
-            game::State state;
-            auto board = game::PerfectBoard(gen_, root_->state);
+            auto board = game::PerfectBoard(gen_, rootAnalysis_);
 
             while (node && !(node->terminal)) {
                 int nVisitsSum = 0;
@@ -70,11 +69,10 @@ namespace tree {
                 }
 
                 board.act(node->actions[actionIndexBest]);
-                state = board.getState();
 
                 parent = node;
-                if (states_.count(state)) {
-                    node = states_.at(state);
+                if (states_.count(board.getState())) {
+                    node = states_.at(board.getState());
                     node->parent = parent;
                     node->parentActionIndex = actionIndexBest;
                 } else {
@@ -83,8 +81,8 @@ namespace tree {
             }
 
             if (!node) {
-                node = createNode(state, parent, actionIndexBest);
-                states_[state] = node;
+                node = createNode(board.getState(), parent, actionIndexBest);
+                states_[board.getState()] = node;
                 parent->children.insert(node);
                 updated_ = node;
             }
@@ -92,7 +90,10 @@ namespace tree {
             if (node->terminal) {
                 propagateValue(node, node->value);
             } else {
-                return state;
+                return board;
+            }
+            if (++it == MAXITER) {
+                return board;
             }
         }
     }
@@ -112,6 +113,11 @@ namespace tree {
         node->actions = game::getPossibleActions(state);
         node->nVisits = std::vector<int>(node->actions.size());
         node->qValues = std::vector<double>(node->actions.size());
+
+        std::uniform_real_distribution<> unif(-1e-8, 1e-8);
+        for (double &qValue: node->qValues) {
+            qValue = unif(gen_);
+        }
 
         auto result = game::getStateResult(state);
         node->terminal = game::isTerminal(result);
@@ -137,7 +143,6 @@ namespace tree {
     }
 
     game::Action Tree::sampleAction() const {
-        std::cout << "sample from tree with " << states_.size() << " nodes" << std::endl;
         std::vector<int> cumulative(root_->nVisits.size());
         std::partial_sum(root_->nVisits.begin(), root_->nVisits.end(), cumulative.begin());
 

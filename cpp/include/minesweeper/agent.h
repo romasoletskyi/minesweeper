@@ -5,7 +5,9 @@
 #include "tree.h"
 
 namespace agent {
-    std::vector<game::Action> getExactActions(const game::State &state);
+    std::vector<game::Action> getExactActionsWeak(const game::State &state);
+
+    std::vector<game::Action> getExactActionsStrong(const game::State &state);
 
     class RandomAgent {
     public:
@@ -13,7 +15,7 @@ namespace agent {
 
         std::vector<game::Action> getActions(const game::State &state);
 
-        game::GameResult rollout(const game::State& state);
+        game::GameResult rollout(game::PerfectBoard board);
 
     private:
         std::mt19937 &gen_;
@@ -29,7 +31,7 @@ namespace agent {
         std::vector<game::Action> getActions(const game::State &state);
 
     private:
-        static std::vector<double> getSimplePolicy(const game::State& state);
+        static std::vector<double> getSimplePolicy(const game::State &state);
 
     private:
         tree::Tree tree_;

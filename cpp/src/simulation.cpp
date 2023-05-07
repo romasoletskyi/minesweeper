@@ -54,52 +54,56 @@ namespace game {
         }
     }
 
-    Board::Board(std::mt19937 &gen, const State &start) : gen_(gen), clear_(false) {
+    Board::Board(std::mt19937 &gen, const StateAnalysis &analysis) : gen_(gen), clear_(false) {
         for (int i = 0; i < HEIGHT; ++i) {
             for (int j = 0; j < WIDTH; ++j) {
-                if (isOpened(start, i, j)) {
+                if (isOpened(analysis.state, i, j)) {
                     ++openedCells_;
                 }
-                open_[i][j] = start[i][j];
+                open_[i][j] = analysis.state[i][j];
                 state_[i][j] = 0;
             }
         }
 
-        auto boundary = getBoundary(start);
-        auto constraints = getMineConstraints(start, boundary);
-        auto variants = getMineVariants(start, constraints);
-        auto probability = getVariantProbability(start, variants);
+        std::vector<double> cumulative(analysis.condensedVariantsProbability.size());
+        std::partial_sum(analysis.condensedVariantsProbability.begin(), analysis.condensedVariantsProbability.end(),
+                         cumulative.begin());
+        auto index = analysis.condensedVariantsIndices[std::distance(cumulative.begin(),
+                                                                     std::lower_bound(cumulative.begin(),
+                                                                                      cumulative.end(),
+                                                                                      std::uniform_real_distribution<>()(
+                                                                                              gen_)))];
 
-        std::vector<double> cumulative(probability.size());
-        std::partial_sum(probability.begin(), probability.end(), cumulative.begin());
-        int chosen = static_cast<int>(std::distance(cumulative.begin(),
-                                                    std::lower_bound(cumulative.begin(), cumulative.end(),
-                                                                     std::uniform_real_distribution<>()(gen_))));
+        int leftMines = MINES;
+        for (int n = 0; n < index.size(); ++n) {
+            const auto &group = analysis.condensedVariants[n][index[n]];
+            leftMines -= group.mines;
 
-        auto boundaryIndices = boundary.getCoordinates();
-        for (int n = 0; n < boundaryIndices.size(); ++n) {
-            auto [i, j] = boundaryIndices[n];
-            if (variants[chosen].variables[n]) {
-                state_[i][j] = BOMB;
+            int chosen = group.indices[std::uniform_int_distribution<>(0, static_cast<int>(group.indices.size()) - 1)(
+                    gen_)];
+            const auto &variant = analysis.variants[n][chosen];
+
+            for (int m = 0; m < variant.variables.size(); ++m) {
+                auto [i, j] = analysis.coordinates[n][m];
+                if (variant.variables[m]) {
+                    state_[i][j] = BOMB;
+                }
             }
         }
 
         std::vector<std::pair<int, int>> indices;
         for (int i = 0; i < HEIGHT; ++i) {
             for (int j = 0; j < WIDTH; ++j) {
-                if (isFlagged(start, i, j)) {
+                if (isFlagged(analysis.state, i, j)) {
                     state_[i][j] = BOMB;
-                } else if (!isOpened(start, i, j) && !isNeighbor(start, i, j)) {
+                    --leftMines;
+                } else if (!isOpened(analysis.state, i, j) && !isNeighbor(analysis.state, i, j)) {
                     indices.emplace_back(i, j);
                 }
             }
         }
 
-        populateMines(indices, variants[chosen].leftMines);
-    }
-
-    void Board::setMine(int i, int j) {
-        state_[i][j] = BOMB;
+        populateMines(indices, leftMines);
     }
 
     void Board::setMineCount(int i, int j, int count) {
@@ -124,7 +128,7 @@ namespace game {
 
         for (int n = 0; n < mines; ++n) {
             auto [i, j] = indices[n];
-            setMine(i, j);
+            state_[i][j] = BOMB;
         }
 
         for (int i = 0; i < HEIGHT; ++i) {
@@ -246,7 +250,7 @@ namespace game {
     PerfectBoard::PerfectBoard(std::mt19937 &gen) : board_(gen) {
     }
 
-    PerfectBoard::PerfectBoard(std::mt19937 &gen, const State& state) : board_(gen, state) {
+    PerfectBoard::PerfectBoard(std::mt19937 &gen, const StateAnalysis &analysis) : board_(gen, analysis) {
     }
 
     const State &PerfectBoard::getState() const {
@@ -260,7 +264,7 @@ namespace game {
         }
 
         while (true) {
-            auto actions = agent::getExactActions(getState());
+            auto actions = agent::getExactActionsStrong(getState());
             if (actions.empty()) {
                 break;
             }

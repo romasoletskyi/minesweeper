@@ -88,12 +88,28 @@ bool play(std::mt19937& gen, bool verbose) {
     }
 }
 
+template<class Agent>
+int tournament(int games, bool verbose) {
+    std::mt19937 gen(42);
+    int won = 0;
+    for (int i = 0; i < games; ++i) {
+        won += play<Agent>(gen, verbose);
+    }
+    return won;
+}
+
 int main() {
     // interactive();
-
     std::mt19937 gen(17);
-    bool result = play<agent::TreeAgent>(gen, true);
-    std::cout << (result ? "WIN": "LOSE");
+    agent::RandomAgent agent(gen);
+    int win = 0;
 
+    for (int i = 0; i < 1000; ++i) {
+        PerfectBoard board(gen);
+        if (agent.rollout(board) == GameResult::Win) {
+            ++win;
+        }
+    }
+    std::cout << win;
     return 0;
 }
