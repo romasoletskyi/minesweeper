@@ -98,7 +98,7 @@ int main() {
     }
 
     auto actionSlow = getExactActionsSlow(state);
-    auto action = agent::getExactActions(state);
+    auto action = agent::getExactActionsWeak(state);
 
     std::cout << "slow" << std::endl;
     for (auto x: actionSlow) {

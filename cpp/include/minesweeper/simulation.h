@@ -35,6 +35,28 @@ namespace game {
     public:
         explicit Board(std::mt19937 &gen);
 
+        Board(const Board &board) : state_(board.state_), open_(board.open_), gen_(board.gen_),
+                                    openedCells_(board.openedCells_), clear_(board.clear_) {
+        }
+
+        Board &operator=(const Board &board) {
+            *this = Board(board);
+            return *this;
+        }
+
+        Board(Board &&board) : state_(std::move(board.state_)), open_(std::move(board.open_)), gen_(board.gen_),
+                               openedCells_(board.openedCells_), clear_(board.clear_) {
+        }
+
+        Board &operator=(Board &&board) {
+            state_ = std::move(board.state_);
+            open_ = std::move(board.open_);
+            gen_ = board.gen_;
+            openedCells_ = board.openedCells_;
+            clear_ = board.clear_;
+            return *this;
+        }
+
         Board(std::mt19937 &gen, const StateAnalysis &analysis);
 
         GameResult act(Action action);

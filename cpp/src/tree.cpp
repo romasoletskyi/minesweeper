@@ -2,7 +2,7 @@
 #include "tree.h"
 
 namespace tree {
-    void Tree::moveto(const game::State &state, std::vector<double> policy) {
+    void Tree::moveto(game::State state, std::vector<double> policy) {
         if (states_.count(state)) {
             root_ = states_.at(state);
         } else {

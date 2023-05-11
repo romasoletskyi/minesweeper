@@ -30,13 +30,27 @@ namespace tree {
     public:
         explicit Tree(std::mt19937 &gen) : gen_(gen) {}
 
-        void moveto(const game::State &state, std::vector<double> policy);
+        Tree(const Tree &tree) : rootAnalysis_(tree.rootAnalysis_), gen_(tree.gen_) {
+            root_ = copyNode(tree.root_, nullptr, states_);
+            updated_ = states_[tree.updated_->state];
+        }
 
-        game::PerfectBoard explore();
+        Tree &operator=(const Tree &tree) {
+            return *this = Tree(tree);
+        }
 
-        void updateNode(std::vector<double> policy, double value);
+        Tree(Tree &&tree) : states_(std::move(tree.states_)), rootAnalysis_(std::move(tree.rootAnalysis_)),
+                            gen_(tree.gen_), root_(tree.root_), updated_(tree.updated_) {
+        }
 
-        game::Action sampleAction() const;
+        Tree &operator=(Tree &&tree) {
+            std::swap(states_, tree.states_);
+            std::swap(rootAnalysis_, tree.rootAnalysis_);
+            gen_ = tree.gen_;
+            root_ = tree.root_;
+            updated_ = tree.updated_;
+            return *this;
+        }
 
         ~Tree() {
             for (const auto &[_, node]: states_) {
@@ -44,8 +58,37 @@ namespace tree {
             }
         }
 
+        void moveto(game::State state, std::vector<double> policy);
+
+        game::PerfectBoard explore();
+
+        void updateNode(std::vector<double> policy, double value);
+
+        game::Action sampleAction() const;
+
+        Node *getUpdatedNode() const {
+            return updated_;
+        }
+
+        Node *getRoot() const {
+            return root_;
+        }
+
     private:
         Node *createNode(const game::State &state, Node *parent, int parentActionIndex);
+
+        Node *copyNode(Node* node, Node* parent, std::unordered_map<game::State, Node*>& states) {
+            auto copy = new Node(*node);
+            states[copy->state] = copy;
+            copy->children.clear();
+            copy->parent = parent;
+
+            for (auto child: node->children) {
+                copy->children.insert(copyNode(child, copy, states));
+            }
+
+            return copy;
+        }
 
         void propagateValue(Node *node, double value);
 

@@ -6,7 +6,7 @@ from time import sleep
 
 def main():
     driver = browser.initialize()
-    agent = engine.ExactAgent()
+    agent = engine.TreeAgent()
 
     while True:
         lost, _ = browser.get_state(driver).get_state()

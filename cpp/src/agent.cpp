@@ -1,5 +1,6 @@
 #include "agent.h"
 #include "utils.h"
+#include <iostream>
 
 namespace agent {
     using namespace game;
@@ -120,8 +121,39 @@ namespace agent {
         }
     }
 
-    std::vector<game::Action> TreeAgent::getActions(const State &state) {
-        auto actions = getExactActionsWeak(state);
+    void TreeAgent::loadState(game::State state, std::vector<double> policy) {
+        tree_.moveto(state, policy);
+    }
+
+    std::vector<game::Action> TreeAgent::getActions(const game::State& state) {
+        std::vector<Action> actions;
+        if (iter_.has_value()) {
+            actions = {tree_.sampleAction()};
+            iter_.reset();
+        } else {
+            actions = agent::getExactActionsStrong(state);
+            if (actions.empty()) {
+                iter_ = 0;
+            }
+        }
+        return actions;
+    }
+
+    std::optional<game::State> TreeAgent::explore() {
+        ++iter_.value();
+        auto board = tree_.explore();
+        if (isTerminal(getStateResult(board.getState()))) {
+            return std::nullopt;
+        }
+        return board.getState();
+    }
+
+    void TreeAgent::update(std::vector<double> policy, double value) {
+        tree_.updateNode(std::move(policy), value);
+    }
+
+    std::vector<game::Action> SimpleTreeAgent::getActions(const State &state) {
+        auto actions = getExactActionsStrong(state);
         if (!actions.empty()) {
             return actions;
         }
@@ -139,7 +171,7 @@ namespace agent {
         return {tree_.sampleAction()};
     }
 
-    std::vector<double> TreeAgent::getSimplePolicy(const State &state) {
+    std::vector<double> SimpleTreeAgent::getSimplePolicy(const State &state) {
         size_t actionSpace = getPossibleActions(state).size();
         return std::vector<double>(actionSpace, 1.0 / (double) actionSpace);
     }

@@ -100,16 +100,6 @@ int tournament(int games, bool verbose) {
 
 int main() {
     // interactive();
-    std::mt19937 gen(17);
-    agent::RandomAgent agent(gen);
-    int win = 0;
-
-    for (int i = 0; i < 1000; ++i) {
-        PerfectBoard board(gen);
-        if (agent.rollout(board) == GameResult::Win) {
-            ++win;
-        }
-    }
-    std::cout << win;
+    std::cout << tournament<agent::TreeAgent>(100, true);
     return 0;
 }

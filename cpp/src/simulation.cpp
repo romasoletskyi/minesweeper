@@ -264,7 +264,7 @@ namespace game {
         }
 
         while (true) {
-            auto actions = agent::getExactActionsStrong(getState());
+            auto actions = agent::getExactActionsWeak(getState());
             if (actions.empty()) {
                 break;
             }
